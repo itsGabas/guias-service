@@ -1,0 +1,12 @@
+demo.py
+demo_gui.py
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+pdfs_teste/
