@@ -3,3 +3,4 @@ uvicorn==0.34.0
 pymupdf
 python-multipart
 fitz
+pandas

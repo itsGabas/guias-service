@@ -1,5 +1,6 @@
 demo.py
 demo_gui.py
+.env
 __pycache__/
 *.pyc
 *.pyo
