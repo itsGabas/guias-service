@@ -25,9 +25,9 @@ from app.models.client import Client
 # CONFIGURAÇÃO — preencha aqui antes de rodar
 # ══════════════════════════════════════════════════════════════════════
 
-GMAIL_REMETENTE = "bonamichigabrielfelipe@gmail.com"          # seu Gmail
-GMAIL_APP_PASSWORD = "gxjj hqmy oqkv mpll"      # App Password de 16 dígitos
-EMAIL_DESTINATARIO = "gabriel@triarcontabilidade.com.br"       # para teste: mesmo e-mail
+GMAIL_REMETENTE = "xxxx"          # seu Gmail
+GMAIL_APP_PASSWORD = "senha_api"      # App Password de 16 dígitos
+EMAIL_DESTINATARIO = "xxxx"
 
 # ══════════════════════════════════════════════════════════════════════
 
