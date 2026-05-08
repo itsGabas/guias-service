@@ -3,6 +3,7 @@ from app.models.client import Client
 from app.models.task import Task
 from app.models.email_log import EmailLog
 from app.models.task_template import TaskTemplate
+import re
 
 
 class MockRepository:
@@ -21,53 +22,36 @@ class MockRepository:
     def get_client(self, client_id: str) -> Optional[Client]:
         return self._clients.get(client_id)
 
+    def delete_client(self, client_id: str) -> bool:
+        if client_id in self._clients:
+            del self._clients[client_id]; return True
+        return False
+
     def get_client_by_cnpj(self, cnpj: str) -> Optional[Client]:
-        import re
-        cnpj_digits = re.sub(r'\D', '', cnpj)
+        digits = re.sub(r'\D', '', cnpj)
         for c in self._clients.values():
-            if c.cnpj_digits() == cnpj_digits:
+            if c.cnpj_digits() == digits:
                 return c
         return None
 
     def get_client_by_ie(self, ie: str) -> Optional[Client]:
-        """Busca cliente pela Inscrição Estadual (compara só dígitos)."""
-        import re
         ie_digits = re.sub(r'\D', '', ie)
-        if len(ie_digits) < 5:
-            return None
+        if len(ie_digits) < 5: return None
         for c in self._clients.values():
             if c.ie_digits() and c.ie_digits() == ie_digits:
                 return c
         return None
 
-    def get_client_by_identifier(self, text: str) -> Optional[Client]:
-        """
-        Tenta encontrar cliente pelo texto do PDF.
-        Primeiro tenta CNPJ, depois IE de cada cliente cadastrado.
-        """
-        import re
-        text_clean = re.sub(r'\D', '', text)
-        # Tenta CNPJ
-        for c in self._clients.values():
-            if c.cnpj_digits() in text_clean:
-                return c
-        # Tenta IE
-        for c in self._clients.values():
-            ie = c.ie_digits()
-            if ie and len(ie) >= 5 and ie in text_clean:
-                return c
-        return None
-
     def list_clients(self, active_only: bool = True) -> List[Client]:
+        clients = list(self._clients.values())
         if active_only:
-            return [c for c in self._clients.values() if c.active]
-        return list(self._clients.values())
+            clients = [c for c in clients if c.active]
+        return sorted(clients, key=lambda c: c.company_name)
 
     # ── TASKS ─────────────────────────────────────────────────────────
 
     def save_task(self, task: Task) -> Task:
-        self._tasks[task.id] = task
-        return task
+        self._tasks[task.id] = task; return task
 
     def get_task(self, task_id: str) -> Optional[Task]:
         return self._tasks.get(task_id)
@@ -87,17 +71,14 @@ class MockRepository:
     # ── EMAIL LOGS ────────────────────────────────────────────────────
 
     def save_email_log(self, log: EmailLog) -> EmailLog:
-        self._email_logs[log.id] = log
-        return log
+        self._email_logs[log.id] = log; return log
 
     def get_logs_by_task(self, task_id: str) -> List[EmailLog]:
         return [l for l in self._email_logs.values() if l.task_id == task_id]
 
     def get_logs_by_client(self, client_id: str) -> List[EmailLog]:
-        return sorted(
-            [l for l in self._email_logs.values() if l.client_id == client_id],
-            key=lambda l: l.sent_at, reverse=True,
-        )
+        return sorted([l for l in self._email_logs.values() if l.client_id == client_id],
+                      key=lambda l: l.sent_at, reverse=True)
 
     def list_all_logs(self) -> List[EmailLog]:
         return sorted(self._email_logs.values(), key=lambda l: l.sent_at, reverse=True)
@@ -105,8 +86,7 @@ class MockRepository:
     # ── TASK TEMPLATES ────────────────────────────────────────────────
 
     def save_template(self, template: TaskTemplate) -> TaskTemplate:
-        self._templates[template.id] = template
-        return template
+        self._templates[template.id] = template; return template
 
     def get_template(self, template_id: str) -> Optional[TaskTemplate]:
         return self._templates.get(template_id)
@@ -120,23 +100,21 @@ class MockRepository:
         return False
 
     def match_template(self, text: str) -> Optional[TaskTemplate]:
-        for template in self._templates.values():
-            matched, _, _ = template.matches(text)
-            if matched:
-                return template
+        for t in self._templates.values():
+            matched, _, _ = t.matches(text)
+            if matched: return t
         return None
 
     # ── STATS ─────────────────────────────────────────────────────────
 
     def stats(self) -> dict:
         from app.models.enums import TaskStatus
-        from app.models.email_log import EmailStatus
         return {
             "total_clients":         len(self._clients),
             "total_tasks":           len(self._tasks),
             "tasks_pendentes":       sum(1 for t in self._tasks.values() if t.status == TaskStatus.PENDENTE),
             "tasks_enviadas":        sum(1 for t in self._tasks.values() if t.status == TaskStatus.ENVIADA),
             "tasks_concluidas":      sum(1 for t in self._tasks.values() if t.status == TaskStatus.CONCLUIDA),
-            "total_emails_enviados": sum(1 for l in self._email_logs.values() if l.status == EmailStatus.ENVIADO),
-            "total_emails_falhos":   sum(1 for l in self._email_logs.values() if l.status == EmailStatus.FALHOU),
+            "total_emails_enviados": sum(1 for l in self._email_logs.values() if l.status.value == "ENVIADO"),
+            "total_emails_falhos":   sum(1 for l in self._email_logs.values() if l.status.value == "FALHOU"),
         }
