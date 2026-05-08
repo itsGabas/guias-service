@@ -8,16 +8,15 @@ import re
 
 class MockRepository:
     def __init__(self):
-        self._clients: Dict[str, Client] = {}
-        self._tasks: Dict[str, Task] = {}
-        self._email_logs: Dict[str, EmailLog] = {}
-        self._templates: Dict[str, TaskTemplate] = {}
+        self._clients:   Dict[str, Client]       = {}
+        self._tasks:     Dict[str, Task]          = {}
+        self._email_logs:Dict[str, EmailLog]      = {}
+        self._templates: Dict[str, TaskTemplate]  = {}
 
     # ── CLIENTS ───────────────────────────────────────────────────────
 
     def save_client(self, client: Client) -> Client:
-        self._clients[client.id] = client
-        return client
+        self._clients[client.id] = client; return client
 
     def get_client(self, client_id: str) -> Optional[Client]:
         return self._clients.get(client_id)
@@ -30,22 +29,12 @@ class MockRepository:
     def get_client_by_cnpj(self, cnpj: str) -> Optional[Client]:
         digits = re.sub(r'\D', '', cnpj)
         for c in self._clients.values():
-            if c.cnpj_digits() == digits:
-                return c
-        return None
-
-    def get_client_by_ie(self, ie: str) -> Optional[Client]:
-        ie_digits = re.sub(r'\D', '', ie)
-        if len(ie_digits) < 5: return None
-        for c in self._clients.values():
-            if c.ie_digits() and c.ie_digits() == ie_digits:
-                return c
+            if c.cnpj_digits() == digits: return c
         return None
 
     def list_clients(self, active_only: bool = True) -> List[Client]:
         clients = list(self._clients.values())
-        if active_only:
-            clients = [c for c in clients if c.active]
+        if active_only: clients = [c for c in clients if c.active]
         return sorted(clients, key=lambda c: c.company_name)
 
     # ── TASKS ─────────────────────────────────────────────────────────
@@ -73,15 +62,16 @@ class MockRepository:
     def save_email_log(self, log: EmailLog) -> EmailLog:
         self._email_logs[log.id] = log; return log
 
-    def get_logs_by_task(self, task_id: str) -> List[EmailLog]:
-        return [l for l in self._email_logs.values() if l.task_id == task_id]
-
-    def get_logs_by_client(self, client_id: str) -> List[EmailLog]:
-        return sorted([l for l in self._email_logs.values() if l.client_id == client_id],
-                      key=lambda l: l.sent_at, reverse=True)
-
     def list_all_logs(self) -> List[EmailLog]:
         return sorted(self._email_logs.values(), key=lambda l: l.sent_at, reverse=True)
+
+    def get_logs_by_client(self, client_id: str) -> List[EmailLog]:
+        return sorted(
+            [l for l in self._email_logs.values() if l.client_id == client_id],
+            key=lambda l: l.sent_at, reverse=True)
+
+    def get_logs_by_task(self, task_name: str) -> List[EmailLog]:
+        return [l for l in self._email_logs.values() if l.task_name == task_name]
 
     # ── TASK TEMPLATES ────────────────────────────────────────────────
 
