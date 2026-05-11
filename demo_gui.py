@@ -22,8 +22,8 @@ from app.models.email_log import EmailLog, EmailStatus
 from app.repositories.mock_repository import MockRepository
 
 # ══════════════════════════════════════════════════════════════════════
-GMAIL_REMETENTE    = "seuemail@gmail.com"
-GMAIL_APP_PASSWORD = "xxxx xxxx xxxx xxxx"
+GMAIL_REMETENTE    = "xxxx"
+GMAIL_APP_PASSWORD = "xxxx"
 HISTORICO_DIR      = os.path.join(os.path.dirname(__file__), "historico", "pdfs")
 # ══════════════════════════════════════════════════════════════════════
 
@@ -40,16 +40,49 @@ class DocumentoDetectado:
         self.size_kb=os.path.getsize(caminho)/1024; self.extracao=extracao
         self.competencia=competencia; self.template=template; self.client=client
 
+    def validar(self) -> list:
+        """Retorna lista de todos os problemas. Lista vazia = pode enviar."""
+        problemas = []
+
+        if not self.template:
+            problemas.append("Nenhuma tarefa cadastrada reconheceu este PDF")
+            return problemas
+
+        if not self.client:
+            problemas.append("Empresa não identificada — selecione manualmente")
+        elif not self.client.emails:
+            problemas.append(f"Empresa sem nenhum e-mail cadastrado")
+        else:
+            dept = self.template.department.value
+            emails = self.client.get_emails_for_department(dept)
+            if not emails:
+                todos = [ce.email for ce in self.client.emails]
+                problemas.append(
+                    f"Nenhum e-mail configurado para {dept} — "
+                    f"e-mails existentes: {', '.join(todos)}"
+                )
+
+        if not self.competencia or self.competencia == "Não informada":
+            problemas.append("Competência não informada")
+
+        return problemas
+
     @property
     def pode_enviar(self) -> bool:
-        """PDF só pode ser enviado se tiver template vinculado."""
-        return self.template is not None
+        return len(self.validar()) == 0
 
     @property
     def bloqueio_motivo(self) -> str:
-        if not self.template:
-            return "Nenhuma tarefa encontrada para este PDF"
-        return ""
+        problemas = self.validar()
+        if not problemas:
+            return ""
+        return "  |  ".join(f"• {p}" for p in problemas)
+
+    @property
+    def icone_status(self) -> str:
+        if self.pode_enviar: return "✓"
+        if not self.template: return "✗"
+        return "⚠"
 
 
 class DemoApp:
@@ -495,7 +528,13 @@ class DemoApp:
                 self._log(f"   Destinatários: {', '.join(emails) if emails else '⚠ nenhum e-mail configurado'}",
                           "ok" if emails else "warn")
         else:
-            self._log(f"   ❌ BLOQUEADO: Nenhuma tarefa encontrada para este PDF — envio não permitido","err")
+            self._log("   ❌ BLOQUEADO: Nenhuma tarefa cadastrada reconheceu este PDF","err")
+            templates=self.repo.list_templates()
+            if not templates:
+                self._log("      → Motivo: Não há templates cadastrados. Crie um na aba Templates.","err")
+            else:
+                self._log(f"      → {len(templates)} template(s) testado(s), nenhum bateu com o conteúdo do PDF","err")
+                self._log("      → Dica: verifique as palavras-chave do template e o conteúdo do PDF","warn")
 
         comp_final,client_final=self._janela_confirmacao(filename,extracao,template,client_det)
         if comp_final is None:
@@ -504,11 +543,15 @@ class DemoApp:
         doc=DocumentoDetectado(caminho,extracao,comp_final,template,client_final)
         self.documentos.append(doc)
 
-        if not doc.pode_enviar:
-            self.lista_docs.insert("end",f"  ✗  ⚠ SEM TAREFA  {filename}")
+        lbl=f" [{template.name}]" if template else ""
+        icone=doc.icone_status
+        if doc.pode_enviar:
+            self.lista_docs.insert("end",f"  {icone}  {filename}{lbl}")
+        elif not template:
+            self.lista_docs.insert("end",f"  {icone}  {filename}  ← SEM TAREFA")
         else:
-            lbl=f" [{template.name}]" if template else ""
-            self.lista_docs.insert("end",f"  ✓  {filename}{lbl}")
+            motivo=doc.bloqueio_motivo.replace("\n","  ").split("•")[1].strip() if "•" in doc.bloqueio_motivo else doc.bloqueio_motivo
+            self.lista_docs.insert("end",f"  {icone}  {filename}{lbl}  ← {motivo[:60]}")
 
         if client_final and self.var_empresa.get()=="—":
             self.var_empresa.set(f"{client_final.company_name} [Cód. {client_final.codigo}]")
@@ -537,7 +580,10 @@ class DemoApp:
                      font=("Segoe UI",9,"bold"),bg=BG,fg=OK).pack(pady=(4,0))
         else:
             tk.Label(popup,text="❌ Nenhuma tarefa vinculada — PDF será bloqueado para envio",
-                     font=("Segoe UI",9,"bold"),bg=BG,fg=ERR).pack(pady=(4,0))
+                     font=("Segoe UI",9,"bold"),bg=BG,fg=ERR).pack(pady=(2,0))
+            n_tpls=len(self.repo.list_templates())
+            dica=f"Nenhum dos {n_tpls} template(s) bateu com o conteúdo" if n_tpls else "Nenhum template cadastrado — crie um na aba Templates"
+            tk.Label(popup,text=f"   {dica}",font=("Segoe UI",8),bg=BG,fg=WARN,wraplength=500).pack()
 
         frame=tk.Frame(popup,bg=PANEL); frame.pack(fill="x",padx=18,pady=10)
         tk.Label(frame,text="Competência:",font=("Segoe UI",9,"bold"),bg=PANEL,fg=SUB
@@ -620,10 +666,13 @@ class DemoApp:
         for doc in aptos:
             dept=doc.template.department.value
             emails=doc.client.get_emails_for_department(dept) if doc.client else []
-            resumo.append(f"  [{dept}] {doc.filename}\n    → {', '.join(emails) if emails else '⚠ SEM E-MAIL'}")
+            resumo.append(f"  ✓ [{dept}] {doc.filename}\n    → {', '.join(emails)}")
         if bloqueados:
-            resumo.append(f"\n  ⚠ {len(bloqueados)} PDF(s) sem tarefa serão ignorados:")
-            for d in bloqueados: resumo.append(f"    • {d.filename}")
+            resumo.append(f"\n  Ignorados ({len(bloqueados)}):")
+            for d in bloqueados:
+                motivos=d.validar()
+                for m in motivos:
+                    resumo.append(f"    {d.icone_status} {d.filename}: {m}")
 
         if not messagebox.askyesno("Confirmar envio",
             f"Competência: {competencia}\n\nEnvios:\n"+"\n".join(resumo)+
@@ -637,8 +686,9 @@ class DemoApp:
             dept=doc.template.department.value
             emails=doc.client.get_emails_for_department(dept) if doc.client else []
             if not emails:
-                self._log(f"   ⚠ {doc.filename} — nenhum e-mail configurado para {dept}","warn")
-                self._registrar_log(doc,competencia,[],EmailStatus.FALHOU,"Nenhum e-mail configurado para o departamento")
+                motivo=f"Nenhum e-mail configurado para {dept}"
+                self._log(f"   ⚠ {doc.filename} — {motivo}","warn")
+                self._registrar_log(doc,competencia,[],EmailStatus.FALHOU,error=motivo)
                 continue
             try:
                 stored_path=self._salvar_copia_pdf(doc)
