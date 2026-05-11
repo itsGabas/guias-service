@@ -1,7 +1,5 @@
 fastapi==0.136.1
 uvicorn==0.34.0
 pymupdf
-python-multipart
-fitz
-pandas
 openpyxl
+python-multipart

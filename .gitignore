@@ -1,14 +1,30 @@
+# Demos — ficam só na máquina local
 demo.py
 demo_gui.py
-.env
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.env
-historico/pdfs/
+*.pyd
+.Python
+
+# Ambiente virtual
 .venv/
 venv/
+env/
+
+# Variáveis de ambiente — NUNCA subir pro Git
+.env
+
+# PDFs do histórico — ficam no servidor, não no repositório
+historico/pdfs/
+
+# Dados de teste
+mock_data/
+pdfs_teste/
+
+# Build
 *.egg-info/
 dist/
 build/
-pdfs_teste/
