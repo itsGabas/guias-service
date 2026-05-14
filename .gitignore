@@ -1,6 +1,7 @@
 # Demos — ficam só na máquina local
 demo.py
 demo_gui.py
+tests/
 
 # Python
 __pycache__/
